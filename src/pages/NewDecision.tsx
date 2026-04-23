@@ -17,6 +17,19 @@ interface FormState {
   tags: string[];
 }
 
+type RequiredKey = Exclude<keyof FormState, 'confidence' | 'tags'>;
+
+const requiredFields: { key: RequiredKey; id: string; label: string }[] = [
+  { key: 'action',          id: 'action',       label: 'решение' },
+  { key: 'context',         id: 'context',      label: 'контекст' },
+  { key: 'alternatives',    id: 'alternatives', label: 'альтернативы' },
+  { key: 'main_argument',   id: 'arg',          label: 'главный аргумент' },
+  { key: 'expect_3m',       id: 'e3',           label: 'ожидание 3 мес' },
+  { key: 'expect_6m',       id: 'e6',           label: 'ожидание 6 мес' },
+  { key: 'expect_12m',      id: 'e12',          label: 'ожидание 12 мес' },
+  { key: 'emotional_state', id: 'emo',          label: 'состояние' },
+];
+
 const empty: FormState = {
   action: '',
   context: '',
@@ -34,18 +47,12 @@ export default function NewDecision() {
   const [form, setForm] = useState<FormState>(empty);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   const navigate = useNavigate();
 
-  const valid =
-    form.action.trim().length > 0 &&
-    form.context.trim().length > 0 &&
-    form.alternatives.trim().length > 0 &&
-    form.main_argument.trim().length > 0 &&
-    form.expect_3m.trim().length > 0 &&
-    form.expect_6m.trim().length > 0 &&
-    form.expect_12m.trim().length > 0 &&
-    form.emotional_state.trim().length > 0 &&
-    form.confidence >= 1 && form.confidence <= 10;
+  const missing = requiredFields.filter(({ key }) => !form[key].trim());
+  const errorFor = (key: RequiredKey) =>
+    attempted && missing.some((m) => m.key === key);
 
   function patch<K extends keyof FormState>(key: K, v: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: v }));
@@ -54,17 +61,30 @@ export default function NewDecision() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!valid || saving) return;
+    if (saving) return;
+
+    if (missing.length > 0) {
+      setAttempted(true);
+      document.getElementById(missing[0].id)?.focus();
+      return;
+    }
+
     setSaving(true);
     try {
       await createDecision(form);
       setSaved(true);
       setForm(empty);
-      // Small pause so the user sees confirmation, then jump to archive.
+      setAttempted(false);
       setTimeout(() => navigate('/archive'), 700);
     } finally {
       setSaving(false);
     }
+  }
+
+  function inputClass(key: RequiredKey, base: string) {
+    return errorFor(key)
+      ? `${base} !border-red-500 dark:!border-red-400`
+      : base;
   }
 
   return (
@@ -85,7 +105,7 @@ export default function NewDecision() {
         <label htmlFor="action" className="field-label">Решение</label>
         <input
           id="action"
-          className="field-input"
+          className={inputClass('action', 'field-input')}
           placeholder="Одно предложение в форме действия"
           value={form.action}
           onChange={(e) => patch('action', e.target.value)}
@@ -99,7 +119,7 @@ export default function NewDecision() {
         <label htmlFor="context" className="field-label">Контекст</label>
         <textarea
           id="context"
-          className="field-textarea"
+          className={inputClass('context', 'field-textarea')}
           rows={3}
           placeholder="3–4 предложения о жизненных обстоятельствах прямо сейчас"
           value={form.context}
@@ -111,7 +131,7 @@ export default function NewDecision() {
         <label htmlFor="alternatives" className="field-label">Альтернативы</label>
         <textarea
           id="alternatives"
-          className="field-textarea"
+          className={inputClass('alternatives', 'field-textarea')}
           rows={3}
           placeholder="Что ещё рассматривал. Обязательно — что отверг и почему."
           value={form.alternatives}
@@ -123,7 +143,7 @@ export default function NewDecision() {
         <label htmlFor="arg" className="field-label">Главный аргумент</label>
         <input
           id="arg"
-          className="field-input"
+          className={inputClass('main_argument', 'field-input')}
           placeholder="Ровно одна причина. Не список."
           value={form.main_argument}
           onChange={(e) => patch('main_argument', e.target.value)}
@@ -136,7 +156,7 @@ export default function NewDecision() {
           <label htmlFor="e3" className="block text-xs text-ink-500 mb-1">Через 3 месяца</label>
           <input
             id="e3"
-            className="field-input"
+            className={inputClass('expect_3m', 'field-input')}
             placeholder="Что ты рассчитываешь увидеть"
             value={form.expect_3m}
             onChange={(e) => patch('expect_3m', e.target.value)}
@@ -146,7 +166,7 @@ export default function NewDecision() {
           <label htmlFor="e6" className="block text-xs text-ink-500 mb-1">Через 6 месяцев</label>
           <input
             id="e6"
-            className="field-input"
+            className={inputClass('expect_6m', 'field-input')}
             placeholder=""
             value={form.expect_6m}
             onChange={(e) => patch('expect_6m', e.target.value)}
@@ -156,7 +176,7 @@ export default function NewDecision() {
           <label htmlFor="e12" className="block text-xs text-ink-500 mb-1">Через 12 месяцев</label>
           <input
             id="e12"
-            className="field-input"
+            className={inputClass('expect_12m', 'field-input')}
             placeholder=""
             value={form.expect_12m}
             onChange={(e) => patch('expect_12m', e.target.value)}
@@ -176,7 +196,7 @@ export default function NewDecision() {
         <label htmlFor="emo" className="field-label">Состояние</label>
         <input
           id="emo"
-          className="field-input"
+          className={inputClass('emotional_state', 'field-input')}
           placeholder="одно слово или короткая фраза"
           value={form.emotional_state}
           onChange={(e) => patch('emotional_state', e.target.value)}
@@ -189,20 +209,25 @@ export default function NewDecision() {
         <TagInput value={form.tags} onChange={(t) => patch('tags', t)} />
       </section>
 
-      <footer className="flex items-center gap-4 pt-4 border-t border-ink-200 dark:border-ink-800">
-        <button type="submit" className="btn-primary" disabled={!valid || saving}>
-          {saving ? 'Сохраняю…' : 'Записать'}
-        </button>
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={() => setForm(empty)}
-          disabled={saving}
-        >
-          Очистить
-        </button>
-        {saved && (
-          <span className="text-sm text-ink-500">записано</span>
+      <footer className="pt-4 border-t border-ink-200 dark:border-ink-800 space-y-3">
+        <div className="flex items-center gap-4">
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? 'Сохраняю…' : 'Записать'}
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => { setForm(empty); setAttempted(false); }}
+            disabled={saving}
+          >
+            Очистить
+          </button>
+          {saved && <span className="text-sm text-ink-500">записано</span>}
+        </div>
+        {attempted && missing.length > 0 && (
+          <p className="text-xs text-red-500 dark:text-red-400">
+            не заполнено: {missing.map((m) => m.label).join(', ')}
+          </p>
         )}
       </footer>
     </form>
