@@ -70,3 +70,31 @@ export async function getTagsForDecision(decisionId: string): Promise<string[]> 
   const tags = await db.tags.bulkGet(links.map((l) => l.tag_id));
   return tags.filter(Boolean).map((t) => t!.name);
 }
+
+/**
+ * Full removal of a decision and everything hanging off it.
+ * Append-only applies to *edits* (no rewriting past entries), not to
+ * the user's right to purge their own data. Tags that become orphaned
+ * (no remaining decisions reference them) are cleaned up too.
+ */
+export async function deleteDecision(id: string): Promise<void> {
+  await db.transaction(
+    'rw',
+    db.decisions, db.reviews, db.decision_tags, db.tags,
+    async () => {
+      const links = await db.decision_tags.where('decision_id').equals(id).toArray();
+      const tagIds = links.map((l) => l.tag_id);
+
+      await db.reviews.where('decision_id').equals(id).delete();
+      await db.decision_tags.where('decision_id').equals(id).delete();
+      await db.decisions.delete(id);
+
+      for (const tagId of tagIds) {
+        const stillUsed = await db.decision_tags.where('tag_id').equals(tagId).count();
+        if (stillUsed === 0) {
+          await db.tags.delete(tagId);
+        }
+      }
+    },
+  );
+}
