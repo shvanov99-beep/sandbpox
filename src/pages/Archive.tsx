@@ -63,13 +63,10 @@ export default function Archive() {
                     <button
                       type="button"
                       onClick={() => setPendingId(d.id)}
-                      aria-label="Удалить решение"
-                      className="w-6 h-6 flex items-center justify-center
-                                 text-ink-300 dark:text-ink-600
-                                 hover:text-red-500 dark:hover:text-red-400
-                                 transition-colors"
+                      className="text-ink-400 hover:text-red-500 dark:text-ink-500
+                                 dark:hover:text-red-400 transition-colors"
                     >
-                      ×
+                      удалить
                     </button>
                   )}
                 </div>
